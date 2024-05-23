@@ -90,7 +90,6 @@ def convert_to_shapefile(df, output_file):
     gdf = gdf.rename(columns={'기관명':'name', '종별코드명':'type', '주소':'add', '총의사수':'num', 'decimalLongitude': 'lon', 'decimalLatitude': 'lat'})
     gdf.to_file(output_file, driver='ESRI Shapefile', encoding='euc-kr')
 
-# 각 데이터프레임에 대해 함수 호출
 convert_to_shapefile(fac_sl_weekday, file_path + 'supply/point_sl_weekday.shp')
 convert_to_shapefile(fac_sl_weekend, file_path + 'supply/point_sl_weekend.shp')
 convert_to_shapefile(fac_gb_weekday, file_path + 'supply/point_gb_weekday.shp')
