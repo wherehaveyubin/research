@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 import geokakao as gk
+import geopandas as gpd
+from shapely.geometry import Point
 
 file_path = 'D:/*'
 
@@ -78,3 +80,18 @@ fac_gb_weekday = fac_weekday[(fac_weekday['주소'].str.startswith('경상북도
 fac_gb_weekend = fac_weekend[(fac_weekend['주소'].str.startswith('경상북도'))] #30행
 fac_gb_weekday.to_csv(file_path + 'supply/fac_gb_weekday.csv', index=False, encoding='euc-kr')
 fac_gb_weekend.to_csv(file_path + 'supply/fac_gb_weekend.csv', index=False, encoding='euc-kr')
+
+# 포인트 객체 생성
+def convert_to_shapefile(df, output_file):
+    df = df[['기관명', '종별코드명', '주소', '총의사수', 'decimalLongitude', 'decimalLatitude']]
+    geometry = [Point(xy) for xy in zip(df['decimalLongitude'], df['decimalLatitude'])]
+    gdf = gpd.GeoDataFrame(df, geometry=geometry)
+    gdf.set_crs(epsg=4326, inplace=True)
+    gdf = gdf.rename(columns={'기관명':'name', '종별코드명':'type', '주소':'add', '총의사수':'num', 'decimalLongitude': 'lon', 'decimalLatitude': 'lat'})
+    gdf.to_file(output_file, driver='ESRI Shapefile', encoding='euc-kr')
+
+# 각 데이터프레임에 대해 함수 호출
+convert_to_shapefile(fac_sl_weekday, file_path + 'supply/point_sl_weekday.shp')
+convert_to_shapefile(fac_sl_weekend, file_path + 'supply/point_sl_weekend.shp')
+convert_to_shapefile(fac_gb_weekday, file_path + 'supply/point_gb_weekday.shp')
+convert_to_shapefile(fac_gb_weekend, file_path + 'supply/point_gb_weekend.shp')
