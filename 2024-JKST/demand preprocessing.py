@@ -69,20 +69,28 @@ skt_gb_group['weekday'] = skt_gb_group['STD_YMD'].dt.weekday
 skt_gb_group['weekend'] = skt_gb_group['weekday'].isin([5, 6]).astype(int)
 skt_gb_weekday = skt_gb_group[skt_gb_group['weekend'] == 0].groupby('SIGUNGU_CD')['pop'].mean().reset_index()
 skt_gb_weekend = skt_gb_group[skt_gb_group['weekend'] == 1].groupby('SIGUNGU_CD')['pop'].mean().reset_index()
+skt_gb_weekday.to_csv(file_path + 'demand/skt_gb_weekday.csv')
+skt_gb_weekend.to_csv(file_path + 'demand/skt_gb_weekend.csv')
 
 # 의료 수요 인구 계산
 pop_wd_sl = pd.merge(card_sl_weekday, skt_sl_weekday, on='SIGUNGU_CD')
 pop_wd_sl['pop_1k'] = pop_wd_sl['pop']/1000
 pop_wd_sl['rate'] = pop_wd_sl['medi.flows']/pop_wd_sl['pop_1k']
+pop_wd_sl.to_csv(file_path + 'demand/pop_wd_sl.csv')
 
 pop_we_sl = pd.merge(card_sl_weekend, skt_sl_weekend, on='SIGUNGU_CD')
 pop_we_sl['pop_1k'] = pop_we_sl['pop']/1000
 pop_we_sl['rate'] = pop_we_sl['medi.flows']/pop_we_sl['pop_1k']
+pop_we_sl.to_csv(file_path + 'demand/pop_we_sl.csv')
 
-pop_wd_gb = pd.merge(card_gb_weekday, skt_gb_weekday, on='SIGUNGU_CD')
+pop_wd_gb = pd.merge(card_gb_weekday, skt_gb_weekday, on='SIGUNGU_CD', how='outer')
 pop_wd_gb['pop_1k'] = pop_wd_gb['pop']/1000
 pop_wd_gb['rate'] = pop_wd_gb['medi.flows']/pop_wd_gb['pop_1k']
+pop_wd_gb.fillna(0, inplace=True)
+pop_wd_gb.to_csv(file_path + 'demand/pop_wd_gb.csv')
 
-pop_we_gb = pd.merge(card_gb_weekend, skt_gb_weekend, on='SIGUNGU_CD')
+pop_we_gb = pd.merge(card_gb_weekend, skt_gb_weekend, on='SIGUNGU_CD', how='outer')
 pop_we_gb['pop_1k'] = pop_we_gb['pop']/1000
 pop_we_gb['rate'] = pop_we_gb['medi.flows']/pop_we_gb['pop_1k']
+pop_we_gb.fillna(0, inplace=True)
+pop_we_gb.to_csv(file_path + 'demand/pop_we_gb.csv')
