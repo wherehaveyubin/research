@@ -92,7 +92,7 @@ def convert_to_shapefile(df, output_file):
     gdf = gdf.rename(columns={'기관명':'name', '종별코드명':'type', '주소':'add', '총의사수':'num', 'decimalLongitude': 'lon', 'decimalLatitude': 'lat'})
     gdf.to_file(output_file, driver='ESRI Shapefile', encoding='euc-kr')
 
-convert_to_shapefile(fac_sl_weekday, file_path + 'shp/point_sl_weekday.shp')
-convert_to_shapefile(fac_sl_weekend, file_path + 'shp/point_sl_weekend.shp')
-convert_to_shapefile(fac_gb_weekday, file_path + 'shp/point_gb_weekday.shp')
-convert_to_shapefile(fac_gb_weekend, file_path + 'shp/point_gb_weekend.shp')
+convert_to_shapefile(fac_sl_weekday, file_path + 'shp/fac_sl_weekday.shp')
+convert_to_shapefile(fac_sl_weekend, file_path + 'shp/fac_sl_weekend.shp')
+convert_to_shapefile(fac_gb_weekday, file_path + 'shp/fac_gb_weekday.shp')
+convert_to_shapefile(fac_gb_weekend, file_path + 'shp/fac_gb_weekend.shp')
