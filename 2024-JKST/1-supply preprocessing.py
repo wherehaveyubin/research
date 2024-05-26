@@ -31,8 +31,8 @@ fac_merge.fillna('', inplace=True) #11151행
 
 # data: localdata 병원 (응급실 데이터 추가 확보)
 er = pd.read_csv(file_path + "raw/01_01_01_P_CSV/fulldata_01_01_01_P_병원.csv", encoding='euc-kr')
-er = er[(er['영업상태명']=='영업/정상') & er['도로명전체주소'].str.startswith(('서울', '경상북도')) & er['진료과목내용명'].str.contains('응급')]
-
+er = er[(er['영업상태명']=='영업/정상') & er['도로명전체주소'].str.startswith(('서울', '경상북도')) & 
+         er['진료과목내용명'].str.contains('응급') & er['업태구분명'].str.startswith(('종합병원', '병원'))]
 er_merge = er[['사업장명', '업태구분명', '도로명전체주소', '의료인수']]
 er_merge = er_merge.rename(columns={'사업장명':'기관명', '업태구분명':'종별코드명', '도로명전체주소':'주소', '의료인수':'총의사수'}) #93행
 er_merge['응급실 야간운영여부'] = 'Y'
@@ -40,7 +40,7 @@ er_merge['응급실 야간운영여부'] = 'Y'
 fac_merge = pd.concat([fac_merge, er_merge], ignore_index=True)
 fac_merge['응급실 야간운영여부'] = fac_merge.groupby('기관명')['응급실 야간운영여부'].transform(lambda x: 'Y' if 'Y' in x.values else 'N')
 
-fac_merge.fillna('', inplace=True) #11244행
+fac_merge.fillna('', inplace=True) #11235행
 fac_merge.to_csv(file_path + 'supply/fac_merge.csv', encoding='euc-kr')
 
 
