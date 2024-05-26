@@ -84,21 +84,21 @@ fac_weekend = fac_merge[(fac_merge['진료시작시간_토'] <= 600) & (fac_merg
 # 지오코딩
 gk.add_coordinates_to_dataframe(fac_weekday, '주소')
 fac_weekday.fillna(0, inplace=True)
-fac_weekday = fac_weekday.drop_duplicates(subset=['decimalLatitude', 'decimalLongitude'], keep='first') #168행
+fac_weekday = fac_weekday.drop_duplicates(subset=['decimalLatitude', 'decimalLongitude'], keep='first') #162행
 fac_weekday.to_csv(file_path + 'supply/fac_weekday.csv', index=False, encoding='euc-kr')
 
 gk.add_coordinates_to_dataframe(fac_weekend, '주소')
 fac_weekend.fillna(0, inplace=True)
-fac_weekend = fac_weekend.drop_duplicates(subset=['decimalLatitude', 'decimalLongitude'], keep='first')
+fac_weekend = fac_weekend.drop_duplicates(subset=['decimalLatitude', 'decimalLongitude'], keep='first') #160행
 fac_weekend.to_csv(file_path + 'supply/fac_weekend.csv', index=False, encoding='euc-kr')
 
-fac_sl_weekday = fac_weekday[(fac_weekday['주소'].str.startswith('서울'))] #129행
-fac_sl_weekend = fac_weekend[(fac_weekend['주소'].str.startswith('서울'))] #127행
+fac_sl_weekday = fac_weekday[(fac_weekday['주소'].str.startswith('서울'))] #124행
+fac_sl_weekend = fac_weekend[(fac_weekend['주소'].str.startswith('서울'))] #122행
 fac_sl_weekday.to_csv(file_path + 'supply/fac_sl_weekday.csv', index=False, encoding='euc-kr')
 fac_sl_weekend.to_csv(file_path + 'supply/fac_sl_weekend.csv', index=False, encoding='euc-kr')
 
-fac_gb_weekday = fac_weekday[(fac_weekday['주소'].str.startswith('경상북도'))] #39행
-fac_gb_weekend = fac_weekend[(fac_weekend['주소'].str.startswith('경상북도'))] #39행
+fac_gb_weekday = fac_weekday[(fac_weekday['주소'].str.startswith('경상북도'))] #38행
+fac_gb_weekend = fac_weekend[(fac_weekend['주소'].str.startswith('경상북도'))] #38행
 fac_gb_weekday.to_csv(file_path + 'supply/fac_gb_weekday.csv', index=False, encoding='euc-kr')
 fac_gb_weekend.to_csv(file_path + 'supply/fac_gb_weekend.csv', index=False, encoding='euc-kr')
 
