@@ -213,6 +213,7 @@ shp_we_sl.to_file(file_path + 'shp/shp_e2sfca_we_sl.shp')
 e2sfca_mean_wd_gb = shp_wd_gb['e2sfca'].mean()
 shp_wd_gb['SPAR'] = shp_wd_gb['e2sfca'] / e2sfca_mean_wd_gb
 shp_wd_gb.to_file(file_path + 'shp/shp_e2sfca_wd_gb.shp')
+
 # 경북 주말
 e2sfca_mean_we_gb = shp_we_gb['e2sfca'].mean()
 shp_we_gb['SPAR'] = shp_we_gb['e2sfca'] / e2sfca_mean_we_gb
