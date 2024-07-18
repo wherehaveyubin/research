@@ -16,18 +16,13 @@ gdf.set_crs(epsg=4326, inplace=True)
 gdf.to_file(file_path + '병원목록_goecd.shp', driver='ESRI Shapefile', encoding='euc-kr')
 
 
-# as type
-den = gpd.read_file('*.shp')
-den['COUNT'] = den['COUNT'].astype('int64')
-den['POP'] = den['POP'].astype('int64')
-den.to_file(file_path + 'den.shp')
-
+# population data preprocessing
+den = gpd.read_file(file_path + 'den.shp')
 den.crs #5179
 
 
 # 포인트 객체 생성
 den_point = den.copy()
 den_point['geometry'] = den_point['geometry'].centroid
-den_point.set_crs(epsg=5179, inplace=True)
 
 den_point.to_file(file_path + 'den_point.shp', driver='ESRI Shapefile', encoding='euc-kr')
