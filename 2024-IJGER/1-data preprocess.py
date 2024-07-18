@@ -30,6 +30,7 @@ den.to_file(file_path + 'den.shp')
 
 den.crs #5179
 
+
 # 포인트 객체 생성
 den_point = den.copy()
 den_point['geometry'] = den_point['geometry'].centroid
