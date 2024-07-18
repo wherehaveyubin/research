@@ -17,8 +17,9 @@ gdf.to_file(file_path + '병원목록_goecd.shp', driver='ESRI Shapefile', encod
 
 
 # as type
-den = gpd.read_file('C:/Users/YUBIN/Desktop/2 접근성 논문 작성/1 data/서울경기인천_확진,인구,고령den.shp')
-den.dtypes
+den = gpd.read_file('*.shp')
+den['COUNT'] = den['COUNT'].astype('int64')
+den['POP'] = den['POP'].astype('int64')
 den.to_file(file_path + 'den.shp')
 
 den.crs #5179
