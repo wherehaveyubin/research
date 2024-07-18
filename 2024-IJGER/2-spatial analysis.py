@@ -97,10 +97,10 @@ eld_buffer['spar'] = eld_buffer['sfca'] / eld_buffer['sfca'].mean()
 cov_buffer['spar'] = cov_buffer['sfca'] / cov_buffer['sfca'].mean()
 
 # 2SFCA 값을 시군구 경계에 조인
-point_pop = den_buffer[['den_name', 'geometry', 'den', 'sfca', 'spar']].merge(point_pop['SGGNM'], left_on='den_name', right_on='SGGNM', how='left')
-point_65 = eld_buffer[['den_name', 'geometry', 'den', 'sfca', 'spar']].merge(point_65['SGGNM'], left_on='den_name', right_on='SGGNM', how='left')
-point_covid = cov_buffer[['den_name', 'geometry', 'den', 'sfca', 'spar']].merge(point_covid['SGGNM'], left_on='den_name', right_on='SGGNM', how='left')
+spar_den = den_buffer[['den_name', 'geometry', 'den', 'sfca', 'spar']].merge(den['SGGNM'], left_on='den_name', right_on='SGGNM', how='right')
+spar_eld = eld_buffer[['den_name', 'geometry', 'den', 'sfca', 'spar']].merge(den['SGGNM'], left_on='den_name', right_on='SGGNM', how='right')
+spar_cov = cov_buffer[['den_name', 'geometry', 'den', 'sfca', 'spar']].merge(den['SGGNM'], left_on='den_name', right_on='SGGNM', how='right')
 
-point_pop.to_file(file_path + 'spar_den.shp', encoding='euc-kr')
-point_65.to_file(file_path + 'spar_eld.shp', encoding='euc-kr')
-point_covid.to_file(file_path + 'spar_cov.shp', encoding='euc-kr')
+spar_den.to_file(file_path + 'spar_den.shp', encoding='euc-kr')
+spar_eld.to_file(file_path + 'spar_eld.shp', encoding='euc-kr')
+spar_cov.to_file(file_path + 'spar_cov.shp', encoding='euc-kr')
