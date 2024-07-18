@@ -17,14 +17,7 @@ gdf.to_file(file_path + '병원목록_goecd.shp', driver='ESRI Shapefile', encod
 
 
 # as type
-shp = gpd.read_file('*.shp')
-shp.dtypes
-shp['SGGCD'] = shp['SGGCD'].astype('int64')
-shp['COUNT'] = shp['COUNT'].astype('int64')
-shp['POP'] = shp['POP'].astype('int64')
-shp.to_file(file_path + 'pop.shp')
-
-den = gpd.read_file('*.shp')
+den = gpd.read_file('C:/Users/YUBIN/Desktop/2 접근성 논문 작성/1 data/서울경기인천_확진,인구,고령den.shp')
 den.dtypes
 den.to_file(file_path + 'den.shp')
 
