@@ -132,14 +132,11 @@ kiosk.to_csv('kiosk.csv', index = False)
 # kiosk df to point
 kiosk['geometry'] = kiosk.apply(lambda row: Point(row['Lon'], row['Lat']), axis=1)
 kiosk_geo = gpd.GeoDataFrame(kiosk, geometry='geometry')
-kiosk_geo = kiosk_geo.drop(columns=['index_right'])
 kiosk_geo.set_crs("EPSG:4326", inplace=True)
 
 study_area = gpd.read_file('Study_area.shp') # 177 rows
 study_area = study_area.to_crs(kiosk_geo.crs)
 kiosk_geo = gpd.sjoin(kiosk_geo, study_area[['GEOID', 'geometry']], how='left', predicate='intersects')
-kiosk_geo = kiosk_geo.drop(columns=['GEOID_left', 'index_right'])
-kiosk_geo = kiosk_geo.rename(columns={'GEOID_right': 'GEOID'})
 
 ###########################################
 
@@ -157,7 +154,7 @@ merged_co = merged_co.rename(columns={
     'GEOID': 'CO_GEOID'
 })
 
-merged_rt = pd.merge(bike_apr_2024, kiosk, left_on = 'Return Kiosk', right_on = 'Kiosk Name')
+merged_rt = pd.merge(bike_apr_2024, kiosk_geo, left_on = 'Return Kiosk', right_on = 'Kiosk Name')
 merged_rt = merged_rt[['Number of Docks', 'GEOID']]
 merged_rt = merged_rt.rename(columns={
     'Number of Docks': 'RT_Docks',
@@ -166,3 +163,197 @@ merged_rt = merged_rt.rename(columns={
 
 merged_df = pd.concat([merged_co, merged_rt], axis=1)
 merged_df.to_csv('merged_df.csv', index = False)
+
+####################################################################################
+
+### Split the data into weekday and weekend ###
+merged_df['Checkout Date'] = pd.to_datetime(merged_df['Checkout Date']) # convert to date type
+merged_df['Day of Week'] = merged_df['Checkout Date'].dt.weekday # assign weekday and weekend
+
+weekday_df = merged_df[merged_df['Day of Week'] < 5] # 22,647 rows
+#weekday_df = weekday_df.dropna(subset=['CO ID', 'RT ID']) # select weekday 22,662 rows
+
+weekend_df = merged_df[merged_df['Day of Week'] >= 5] # 8,162 rows
+#weekend_df = weekend_df.dropna(subset=['CO ID', 'RT ID']) # select weekend 8,074 rows
+
+weekday_df.to_csv('weekday_df.csv', index = False)
+weekend_df.to_csv('weekend_df.csv', index = False)
+
+
+########################################################################################################################
+
+# 2. Identify communities
+from collections import Counter
+import pandas as pd
+
+def count_flow(infile, col1, col2, outfile):
+    flow_count_dict = {} # Create a dictionary to store counts of flows between zone pairs
+    id_list = [] # Create a list to store unique zone IDs
+    bigfile = open(infile) # Open file
+    bigfile.readline() # Skip the header
+    for lineno, line in enumerate(bigfile):
+        # If the value in column col1 is empty, return the id_list and flow_count_dict
+        if line.split(',')[col1] == '':
+            return id_list, flow_count_dict
+
+        # Get the zone1_id and zone2_id
+        zone1_id = int(line.split(',')[col1])
+        zone2_id = int(line.split(',')[col2])
+        
+        # Skip if the zone1_id and zone2_id are the same
+        if zone1_id == zone2_id:
+            continue
+        
+        # Add zone1_id and zone2_id to id_list if it isn't already present
+        if zone1_id not in id_list:
+            id_list.append(zone1_id)
+        if zone2_id not in id_list:
+            id_list.append(zone2_id)
+        
+        # Create pairs of zone1 and zone2
+        zone_pair = (zone1_id, zone2_id)
+        zone_pair_reverse = (zone2_id, zone1_id)
+
+        # Add the flow count for each zone pair
+        if zone_pair in flow_count_dict:
+            flow_count_dict[zone_pair] += 1
+        elif zone_pair_reverse in flow_count_dict:
+            flow_count_dict[zone_pair_reverse] += 1
+        else:
+            flow_count_dict[zone_pair] = 1 # Assign 1 if the zone pair doesn't exist
+
+        # Print the line number
+        print(str(lineno)) 
+
+    # Export outfile
+    with open(outfile, "w") as output:
+        for k, v in flow_count_dict.items():
+            output.write(str(k) + '\t' + str(v) + '\n')
+    return id_list, flow_count_dict
+
+# Analyze data
+col1 = 3  # checkout kiosk id
+col2 = 5  # return kiosk id
+infile = "weekend_df.csv" # merged_df, weekday_df, weekend_df
+outfile = "weekend_df.txt"
+result = count_flow(infile, col1, col2, outfile)
+
+# Creat a dataframe from outfile
+result_list = result[1]
+result_df = pd.DataFrame(list(result_list.items()), columns=['Points', 'Value'])
+result_df[['id1', 'id2']] = pd.DataFrame(result_df['Points'].tolist(), index=result_df.index)
+result_df = result_df[['id1', 'id2', 'Value']]
+
+# Sort ascending or descending frequency by Value
+result_df.sort_values(by='Value', ascending=False)
+
+# analyze community detection
+import igraph as ig
+from igraph import *
+from functools import reduce # Python3
+
+# Get vertices and flow_count_dict by using count_flow function
+vertices, flow_count_dict = count_flow(infile, col1, col2, outfile)
+
+g = Graph(directed=False) # Create an undirected graph
+
+# Create lists to store edge and weight
+edge_list = []
+weight_list = []
+
+# Add the edge and weight lists
+for k, v in flow_count_dict.items():
+    edge_list.append(k)
+    weight_list.append(v)
+
+g.add_vertices(vertices) # Add the vertices to graph
+
+# Convert zone pairs in edge_list to vertex indices in edge_list_index
+edge_list_index = []
+for pair in edge_list:
+    # Find the index of each zone in the vertices list and add the pair of indices to edge_list_index
+    edge_list_index.append((vertices.index(pair[0]),vertices.index(pair[1])))
+g.add_edges(edge_list_index)
+
+# Assign weight and label the weight
+g.es['weight'] = weight_list
+g.es['label'] = weight_list
+
+# Detect community using multilevel methodology
+community = g.community_multilevel(weights = weight_list)
+print(community.membership)
+
+# Write a result file
+"""
+with open("community_all.txt", "w") as output: # remember to change this file name for May data
+    for i in range (len(vertices)):
+        output.write(str(vertices[i]) +'\t'+ str(community.membership[i])+'\n')
+"""
+
+data = {
+    'GEOID': [str(v) for v in vertices],
+    'Community': [community.membership[i] for i in range(len(vertices))]
+}
+df = pd.DataFrame(data)
+df['GEOID'] = df['GEOID'].astype(str)
+df.to_csv('community_weekend.csv', index=False) # merged_df, weekday_df, weekend_df
+
+
+######################################################################################
+
+# Accessibility
+
+# STEP 1
+# Import kiosk point
+kiosk_point = gpd.read_file('kiosk_point.shp') # 86 rows
+
+# Import kiosk buffer
+kiosk_buffer = gpd.read_file('kiosk_SA.shp')
+kiosk_buffer['name'] = [name.split(' :')[0] for name in kiosk_buffer['Name']]
+kiosk_buffer['name'] = kiosk_buffer['name'].astype(str)
+kiosk_point['Kiosk ID'] = kiosk_point['Kiosk ID'].astype(str)
+
+# Join kiosk to kiosk buffer
+kiosk_buffer = gpd.GeoDataFrame(kiosk_buffer[['name', 'geometry']]).merge(kiosk_point[['Kiosk ID', 'Kiosk Name', 'Number of']], left_on='name', right_on='Kiosk ID', how='inner')
+kiosk_buffer = gpd.GeoDataFrame(kiosk_buffer, geometry='geometry')
+
+# Import population
+census_point = gpd.read_file('census_tract_point.shp') # 311 rows
+census_point = census_point.to_crs(kiosk_buffer.crs)
+#census_point = census_point.to_crs(fac_buffer.crs)
+
+# Spatial join
+result = gpd.sjoin(kiosk_buffer, census_point, how="inner", predicate="intersects") 
+sum_pop_rate = result.groupby('name')['pop'].sum().reset_index()
+sum_pop_rate.rename(columns={'pop': 'pop_sum'}, inplace=True)
+kiosk_buffer['pop_sum'] = kiosk_buffer['name'].map(sum_pop_rate.set_index('name')['pop_sum']).fillna(0)
+
+# Join kiosk buffer to kiosk
+kiosk_point = gpd.GeoDataFrame(kiosk_buffer[['name', 'pop_sum']]).merge(kiosk_point[['Kiosk ID', 'Number of', 'geometry']], left_on='name', right_on='Kiosk ID', how='inner')
+kiosk_point = gpd.GeoDataFrame(kiosk_point, geometry='geometry')
+
+
+# Step 2
+
+# Import pop buffer
+pop_buffer = gpd.read_file('census_tract_SA.shp')
+pop_buffer['pop_name'] = [name.split(' :')[0] for name in pop_buffer['Name']]
+
+# Join pop to pop buffer
+pop_buffer = pop_buffer[['pop_name', 'geometry']].merge(census_point[['NAME', 'pop']], left_on='pop_name', right_on='NAME', how='inner')
+pop_buffer.drop(columns=['NAME'], inplace=True)
+
+# Spatial join
+result = gpd.sjoin(pop_buffer, kiosk_point, how="inner", predicate="intersects") 
+sum_ProToPop = result.groupby('pop_name')['pop_sum'].sum().reset_index()
+sum_ProToPop.rename(columns={'pop_sum': 'sfca'}, inplace=True)
+pop_buffer['sfca'] = pop_buffer['pop_name'].map(sum_ProToPop.set_index('pop_name')['sfca']).fillna(0)
+
+# Divide by mean
+pop_buffer['spar'] = pop_buffer['sfca'] / pop_buffer['sfca'].mean()
+
+# Join 2SFCA value to census tract shp file
+census_tract = gpd.read_file('Study_area.shp')
+spar = census_tract[['NAME', 'geometry']].merge(pop_buffer[['pop_name', 'pop', 'sfca', 'spar']], left_on='NAME', right_on='pop_name', how='left')
+spar.drop(columns=['NAME'], inplace=True)
+spar.to_file('spar.shp')
