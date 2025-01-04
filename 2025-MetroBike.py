@@ -138,6 +138,8 @@ study_area = gpd.read_file('Study_area.shp') # 177 rows
 study_area = study_area.to_crs(kiosk_geo.crs)
 kiosk_geo = gpd.sjoin(kiosk_geo, study_area[['GEOID', 'geometry']], how='left', predicate='intersects')
 
+
+
 ###########################################
 
 # Filter the DataFrame to exclude rows where 'Checkout Kiosk' or 'Return Kiosk' contains any of the values in the kiosks_to_remove list
@@ -298,6 +300,44 @@ df = pd.DataFrame(data)
 df['GEOID'] = df['GEOID'].astype(str)
 df.to_csv('community_weekend.csv', index=False) # merged_df, weekday_df, weekend_df
 
+###########################################################통계값#####
+
+import pandas as pd
+
+# 데이터 불러오기
+community_df = pd.read_csv("community_weekend.csv")
+original_df = pd.read_csv("weekend_df.csv")
+original_df['Checkout Hour'] = pd.to_datetime(original_df['Checkout Time']).dt.hour
+
+# Merge community information with the original data
+original_df['GEOID'] = original_df['CO_GEOID']
+#original_df['GEOID2'] = original_df['RT_GEOID']
+merged_df = pd.merge(original_df, community_df, on="GEOID", how="left")
+#merged_df = pd.merge(merged_df, community_df, left_on="GEOID2", right_on='GEOID', how="left")
+
+#merged_df.to_csv('cm_merged.csv', index=False)
+#merged_df.to_csv('cm_weekday.csv', index=False)
+
+pivot_table = pd.pivot_table(merged_df, 
+                             index='Community_x',  # Community_x를 인덱스로 설정
+                             columns='Community_y',  # Community_y를 컬럼으로 설정
+                             aggfunc='size',  # 각 조합의 빈도수를 세기
+                             fill_value=0)  # 빈 값은 0으로 채움
+
+print(pivot_table)
+
+# 그룹화 및 통계 계산
+def top_3_modes(series):
+    return series.value_counts().head(3).index.tolist()
+
+# CO_GEOID별 통계 계산, Community도 포함
+result = merged_df.groupby('Community').agg(
+    Total_Flows=('Community', 'count'),  # 총 이동량: 각 Community에 속한 GEOID의 이동 횟수 총합
+    Top_3_Peak_Hours=('Checkout Hour', top_3_modes)  # 최빈 시간대 상위 3개
+).reset_index()
+
+# 결과 출력
+print(result)
 
 ######################################################################################
 
