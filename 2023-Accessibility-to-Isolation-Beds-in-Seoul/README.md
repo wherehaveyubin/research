@@ -1,0 +1,1 @@
+Lee, Y., & Hwang, C. S. (2023). Accessibility to Isolation Beds in Seoul Considering Population Characteristics, 15th Korea-China-Japan Joint Conference on Geography in Seoul, South Korea. (Young Geographers Award - Best Paper)
