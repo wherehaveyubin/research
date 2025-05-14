@@ -37,7 +37,7 @@ Accessibility to nighttime hospitals on weekdays and weekends using E2SFCA and m
 
 | Year | Project | Description |
 |------|---------|-------------|
-| 2024 | [Night-time Hospital Access](./2024-JKST) | Analyzed regional disparities in night-time hospital accessibility using mobility data and the E2SFCA method. |
+| 2024 | [Night-time Hospital Access](./2024-Night-Time-Hospital-Accessibility) | Analyzed regional disparities in night-time hospital accessibility using mobility data and the E2SFCA method. |
 
 <br/>
 
