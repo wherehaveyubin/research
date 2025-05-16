@@ -23,8 +23,9 @@ This repository is organized by research topic, with each section linking to rel
 ## 1. 😷 COVID-19 Medical Accessibility in Korea
 
 Analysis of accessibility to beds in the Negative Pressure Isolation Room (NPIR) in Seoul, Gyeonggi, and Incheon.
-Data: crawled NPIR beds capacity, cralwed COVID-19 confirmed case, building type
-Methods: 2SFCA, E2SFCA, GWR
+<br/>
+- Data: crawled NPIR beds capacity, cralwed COVID-19 confirmed case, building type
+- Methods: 2SFCA, E2SFCA, GWR
 
 | Year | Project | Description |
 |------|---------|-------------|
@@ -36,8 +37,9 @@ Methods: 2SFCA, E2SFCA, GWR
 ## 2. 🏥 Healthcare Accessibility using Credit Card and Mobile Phone Data
 
 Accessibility to nighttime hospitals on weekdays and weekends using E2SFCA and multi-source mobility data (card + telecom) in Seoul and Gyeongbuk, South Korea.
-Data: Shinhan credit card transaction, SK telecom phone mobility data, crawled nighttime-available doctor capacity
-Methods: E2SFCA
+<br/>
+- Data: Shinhan credit card transaction, SK telecom mobility data, crawled nighttime-available doctor capacity
+- Methods: E2SFCA
 
 | Year | Project | Description |
 |------|---------|-------------|
@@ -48,8 +50,9 @@ Methods: E2SFCA
 ## 3. 🚲 Urban Mobility and Bike-Sharing in the US
 
 Analysis of shared bike usage in Austin, Texas using community detection, 2SFCA, and GWR.
-Data: MetroBike transaction
-Methods: Community detection, 2SFCA, GWR
+<br/>
+- Data: MetroBike transaction
+- Methods: Community detection, 2SFCA, GWR
 
 | Year | Project | Description |
 |------|---------|-------------|
