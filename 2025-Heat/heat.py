@@ -43,3 +43,6 @@ df_az = df[
 ]
 df_az.head()
 
+df_az_selected = df_az[
+    df_az["visitor_home_cbgs"].notnull() & df_az["poi_cbg"].notnull()
+][["visitor_home_cbgs", "poi_cbg", "raw_visit_counts"]]
