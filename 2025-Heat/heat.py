@@ -1,4 +1,5 @@
 # https://docs.deweydata.io/docs/api-access
+# Download Github Desktop first
 
 pip install deweydatapy@git+https://github.com/Dewey-Data/deweydatapy
 
