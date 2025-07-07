@@ -87,7 +87,7 @@ variables = variables.merge(hvi, on="GEOIDFQ", how="left")
 variables.to_csv(workspace + 'variables.csv')
 
 # =====================================================================
-# RESULTS: varialbes by census tract points        
+# RESULTS: variables by census tract points        
 # tracts_variables.shp
 # =====================================================================
 # Spatial join to census tract points
