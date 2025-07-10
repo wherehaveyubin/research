@@ -97,3 +97,18 @@ print(f"{len(df_all)} rows loaded from {len(yellow_files) + len(green_files)} fi
 output_path = os.path.join("data", "taxi", "nyc_taxi_od.csv")
 df_all.to_csv(output_path, index=False)
 print(f"CSV saved to: {output_path}")
+
+
+# import taxi data
+taxi = pd.read_csv(workspace + "taxi/nyc_taxi_od.csv", low_memory=False)
+taxi # 8,484,325 rows
+
+## node
+# import taxi zone, census tract point shp file
+taxi_zone = gpd.read_file("D:/heat/data/taxi/taxi_zones/taxi_zones.shp") # 263 rows
+taxi_zone = taxi_zone.dissolve(by='LocationID', aggfunc='first').reset_index() # 260 rows
+tract_point = gpd.read_file("D:/heat/data/boundary/tract_variables.shp") # 2,324 rows
+
+# EPSG:2263 (NAD83 / New York Long Island ftUS)
+taxi_zone = taxi_zone.to_crs(epsg=2263)
+tract_point = tract_point.to_crs(epsg=2263)
