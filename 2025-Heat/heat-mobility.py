@@ -112,3 +112,7 @@ tract_point = gpd.read_file("D:/heat/data/boundary/tract_variables.shp") # 2,324
 # EPSG:2263 (NAD83 / New York Long Island ftUS)
 taxi_zone = taxi_zone.to_crs(epsg=2263)
 tract_point = tract_point.to_crs(epsg=2263)
+
+joined = gpd.sjoin(taxi_zone, tract_point, how='left', predicate='intersects')
+
+cols_to_avg = ['LocationID', 'male', 'under18', 'age65plus', 'white', 'black', 'native', 'asian', 'HVI', 'geometry']
