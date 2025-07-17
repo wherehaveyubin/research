@@ -116,3 +116,19 @@ tract_point = tract_point.to_crs(epsg=2263)
 joined = gpd.sjoin(taxi_zone, tract_point, how='left', predicate='intersects')
 
 cols_to_avg = ['LocationID', 'male', 'under18', 'age65plus', 'white', 'black', 'native', 'asian', 'HVI', 'geometry']
+filtered = joined[cols_to_avg]
+node_df = filtered.groupby('LocationID').agg({
+    'male': 'mean',
+    'under18': 'mean',
+    'age65plus': 'mean',
+    'white': 'mean',
+    'black': 'mean',
+    'native': 'mean',
+    'asian': 'mean',
+    'HVI': lambda x: x.mode().iloc[0] if not x.mode().empty else None, # mode
+    'geometry': 'first'
+}).reset_index()
+
+node_df = node_df.set_geometry('geometry')
+node_df['geometry'] = node_df['geometry'].centroid
+node_df.to_csv("node_df.csv")
