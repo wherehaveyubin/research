@@ -113,3 +113,12 @@ citibike = citibike.join_asof(
     right_on="DATE",
     strategy="nearest"  # "backward" (default), "forward", or "nearest"
 )
+
+edge_df = citibike.groupby(
+    ['start_station_id', 'end_station_id', 'date', 'hour', 'weekday'],
+    as_index=False
+).agg(
+    heat_index=('heat_index', 'first'),
+    is_heat=('is_heat', 'max'),
+    weight=('ride_id', 'count')
+)
