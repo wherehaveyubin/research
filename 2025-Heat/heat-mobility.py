@@ -117,3 +117,82 @@ del od_group
 del od_records
 
 edge_df.to_csv(workspace + "edge_df.csv") # 22,662,046 rows
+
+# =====================================================================
+# Mobility analysis – degree centrality
+# =====================================================================
+#edge_df = pd.read_csv(workspace + "edge_df.csv")
+
+# Filter edges by heat condition
+edge_normal = edge_df[edge_df["is_heat"] == 0]
+edge_heat = edge_df[edge_df["is_heat"] == 1]
+
+# Function to build directed graph from edge DataFrame
+def build_graph(df, desc="Building Graph"):
+    G = nx.DiGraph()
+    for _, row in tqdm(df.iterrows(), total=len(df), desc=desc):
+        G.add_edge(row["start_GEOIDFQ"], row["end_GEOIDFQ"])
+    return G
+
+# Create graphs for normal and heat days
+G_normal = build_graph(edge_normal)
+G_heat = build_graph(edge_heat)
+
+# Function to compute degree centrality
+def compute_degree_centrality(G, label):
+    deg = nx.degree_centrality(G)
+    return pd.DataFrame({
+        "start_GEOIDFQ": list(deg.keys()),
+        f"degree_{label}": list(deg.values())
+    })
+
+# Compute centrality for each graph
+df_deg_normal = compute_degree_centrality(G_normal, "normal")
+df_deg_heat = compute_degree_centrality(G_heat, "heat")
+
+# Merge centrality values with tract geometries
+gdf_normal = pd.merge(tract_boundary, df_deg_normal, left_on='GEOIDFQ', right_on="start_GEOIDFQ", how="right")
+gdf_heat = pd.merge(tract_boundary, df_deg_heat, left_on='GEOIDFQ', right_on="start_GEOIDFQ", how="right")
+
+# Set common color scale range
+vmin = min(
+    gdf_normal["degree_normal"].min(),
+    gdf_heat["degree_heat"].min()
+)
+vmax = max(
+    gdf_normal["degree_normal"].max(),
+    gdf_heat["degree_heat"].max()
+)
+
+# Create subplots
+fig, axes = plt.subplots(1, 2, figsize=(12, 7))
+
+# Define shared color scale
+norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+cmap = plt.cm.YlOrRd
+
+# Plot: Normal Days
+tract_boundary.plot(ax=axes[0], facecolor='none', edgecolor='lightgray', linewidth=0.5)  # base layer: tract outlines
+gdf_normal.plot(column="degree_normal", cmap=cmap, linewidth=0.5, edgecolor='none',
+                ax=axes[0], norm=norm)
+axes[0].set_title("Degree Centrality (Normal Days)")
+axes[0].axis("off")
+
+# Plot: Heat Days
+tract_boundary.plot(ax=axes[1], facecolor='none', edgecolor='lightgray', linewidth=0.5)  # base layer: tract outlines
+gdf_heat.plot(column="degree_heat", cmap=cmap, linewidth=0.5, edgecolor='none',
+              ax=axes[1], norm=norm)
+axes[1].set_title("Degree Centrality (Heat Days)")
+axes[1].axis("off")
+
+# Adjust layout spacing and reserve space for colorbar
+fig.subplots_adjust(right=0.85, wspace=0.05)
+
+# Add shared colorbar
+cbar_ax = fig.add_axes([0.88, 0.25, 0.015, 0.5])  # [left, bottom, width, height]
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+sm._A = []
+fig.colorbar(sm, cax=cbar_ax, label="Degree Centrality")
+
+plt.show()
+plt.savefig('D:/heat-mobility/map/Degree centrality.png', bbox_inches='tight')
