@@ -196,3 +196,52 @@ fig.colorbar(sm, cax=cbar_ax, label="Degree Centrality")
 
 plt.show()
 plt.savefig('D:/heat-mobility/map/Degree centrality.png', bbox_inches='tight')
+
+"""
+# ---------------------------------------------------------------------
+# w/o self-loops
+# ---------------------------------------------------------------------
+G2_normal = G_normal.copy()
+G2_heat = G_heat.copy()
+
+# Remove self-loops
+G2_normal.remove_edges_from(nx.selfloop_edges(G2_normal))
+G2_heat.remove_edges_from(nx.selfloop_edges(G2_heat))
+
+df_deg_normal2 = compute_degree_centrality(G2_normal, "normal_noloop")
+df_deg_heat2 = compute_degree_centrality(G2_heat, "heat_noloop")
+
+gdf_normal2 = pd.merge(tract_boundary, df_deg_normal2, left_on='GEOIDFQ', right_on="start_GEOIDFQ", how="right")
+gdf_heat2 = pd.merge(tract_boundary, df_deg_heat2, left_on='GEOIDFQ', right_on="start_GEOIDFQ", how="right")
+
+vmin2 = min(gdf_normal2["degree_normal_noloop"].min(), gdf_heat2["degree_heat_noloop"].min())
+vmax2 = max(gdf_normal2["degree_normal_noloop"].max(), gdf_heat2["degree_heat_noloop"].max())
+norm2 = mcolors.Normalize(vmin=vmin2, vmax=vmax2)
+
+fig, axes = plt.subplots(1, 2, figsize=(12, 7))
+cmap = plt.cm.YlGnBu
+
+# Plot: Normal Days (No self-loop)
+tract_boundary.plot(ax=axes[0], facecolor='none', edgecolor='lightgray', linewidth=0.5)
+gdf_normal2.plot(column="degree_normal_noloop", cmap=cmap, norm=norm2,
+                 linewidth=0.5, edgecolor='none', ax=axes[0])
+axes[0].set_title("Degree Centrality (Normal Days, No Self-loop)")
+axes[0].axis("off")
+
+# Plot: Heat Days (No self-loop)
+tract_boundary.plot(ax=axes[1], facecolor='none', edgecolor='lightgray', linewidth=0.5)
+gdf_heat2.plot(column="degree_heat_noloop", cmap=cmap, norm=norm2,
+               linewidth=0.5, edgecolor='none', ax=axes[1])
+axes[1].set_title("Degree Centrality (Heat Days, No Self-loop)")
+axes[1].axis("off")
+
+# Shared colorbar
+fig.subplots_adjust(right=0.85, wspace=0.05)
+cbar_ax = fig.add_axes([0.88, 0.25, 0.015, 0.5])
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm2)
+sm._A = []
+fig.colorbar(sm, cax=cbar_ax, label="Degree Centrality (No Self-loop)")
+
+plt.show()
+plt.savefig("D:/heat-mobility/map/Degree_centrality_no_selfloop.png", bbox_inches='tight')
+"""
