@@ -7,7 +7,7 @@ from tqdm import tqdm
 import glob
 import os
 
-workspace = "D:/YUBIN/data/"
+workspace = "*/"
 cbg_path = workspace + "0-raw/tl_2018_04_bg/tl_2018_04_bg_Maricopa_Pinal.shp"
 raster_folder = workspace + "0-raw/LST_Weekly_MODIS/day/"
 output_folder = workspace + "1-processed/lst-CBG/"
