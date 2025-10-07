@@ -6,9 +6,14 @@ from shapely.geometry import Point, mapping
 from tqdm import tqdm
 import glob
 import os
+from rasterstats import zonal_stats
 
 workspace = "*/"
 cbg_path = workspace + "0-raw/tl_2018_04_bg/tl_2018_04_bg_Maricopa_Pinal.shp"
+
+# =========================================
+# 1. Weekly LST Data Processing
+# =========================================
 raster_folder = workspace + "0-raw/LST_Weekly_MODIS/day/"
 output_folder = workspace + "1-processed/lst-CBG/"
 
@@ -70,3 +75,41 @@ for raster_path in tif_files:
     # Save final result
     lst_cbg.to_file(lst_cbg_path, driver="ESRI Shapefile")
     print(f"✅ Saved: {lst_cbg_path}")
+
+# =========================================
+# 2. Sen’s Slope Trend Data Processing
+# =========================================
+raster_folder = workspace + "0-raw/sens_slope/"
+output_folder = workspace + "1-processed/sens-CBG/"
+
+raster_path = raster_folder + "sensSlope_LST_2000_2023_Senslope.tif"
+
+fname = os.path.splitext(os.path.basename(raster_path))[0]
+sens_cbg_path = os.path.join(output_folder, f"{fname}_mean.shp")
+
+print(f"▶️ Processing: {fname}")
+
+# Load raster and check CRS consistency
+with rasterio.open(raster_path) as src:
+    raster_crs = src.crs
+
+if cbg.crs != raster_crs:
+    cbg = cbg.to_crs(raster_crs)
+
+# Compute zonal mean using rasterstats
+print("📊 Calculating zonal statistics (mean)...")
+stats = zonal_stats(
+    vectors=cbg,
+    raster=raster_path,
+    stats=["mean"],
+    nodata=None,
+    geojson_out=False
+)
+
+# Create output GeoDataFrame
+sens_cbg = cbg[["GEOID", "geometry"]].copy()
+sens_cbg["HEAT"] = [s["mean"] for s in stats]
+
+# Save output shapefile
+sens_cbg.to_file(sens_cbg_path, driver="ESRI Shapefile")
+print(f"✅ Saved: {sens_cbg_path}")
