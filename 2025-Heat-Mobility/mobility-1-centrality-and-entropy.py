@@ -20,20 +20,32 @@ from mapclassify import JenksCaspall
 # 1. Load mobility data
 # =========================================
 # Set workspace path
-workspace = "*/"
+workspace = "*"
+
+# Import Census Block Group shp file
+cbg = gpd.read_file(workspace + "0-raw/tl_2018_04_bg/tl_2018_04_bg_Maricopa_Pinal.shp")  # 2,704 rows
+cbg = cbg.drop(columns=["GEOID_int", "GEOID_in_1"], errors="ignore")
+cbg = cbg[["GEOID", "geometry"]]
+cbg["GEOID"] = cbg["GEOID"].str[1:]  # Remove potential prefix
+valid_geoids = set(cbg["GEOID"])
 
 # Import raw mobility dataset
 df_raw = pd.read_csv(
     workspace + "0-raw/mobility_phoenix/od_flow-visitor_home_cbgs-poi_cbg-Maricopa_Pinal_County-2023-01-02_2023-12-25.csv.gz",
     compression="gzip"
-)
+) # 12,036,112 rows
+
+df_raw = df_raw[
+    df_raw["visitor_home_cbgs"].astype(str).isin(valid_geoids) &
+    df_raw["poi_cbg"].astype(str).isin(valid_geoids)
+].copy() # 12,036,112 rows
 
 # Filter data for the summer period (June–August 2023)
 df_raw["date_range_start"] = pd.to_datetime(df_raw["date_range_start"])
 df_raw = df_raw[
     (df_raw["date_range_start"] >= "2023-06-01") &
     (df_raw["date_range_start"] <= "2023-08-28")
-]
+] # 3,351,816 rows
 
 # Aggregate visitors by month
 df_raw.loc[:, "month"] = df_raw["date_range_start"].dt.to_period("M").astype(str)
@@ -41,13 +53,14 @@ df = (
     df_raw.groupby(["month", "visitor_home_cbgs", "poi_cbg"], as_index=False)
     .agg({"visitor": "sum"})
 )
-df["visitor_home_cbgs"] = df["visitor_home_cbgs"].astype(str)
+df["visitor_home_cbgs"] = df["visitor_home_cbgs"].astype(str) # 1,993,151 rows
+df.to_csv(workspace + "1-processed/centrality/df.csv", index=False, encoding="utf-8-sig")
 
 del df_raw
 
 
 # =========================================
-# 4. Monthly Network Analysis – Temporal
+# 2. Monthly Network Analysis – Temporal
 # =========================================
 # Calculate centrality and flow diversity for each month
 def calculate_monthly_centrality(df, month):
@@ -118,8 +131,9 @@ df_results = pd.concat([df_cent_june, df_cent_july, df_cent_aug], ignore_index=T
 
 
 # =========================================
-# 5. Plot monthly distribution comparisons
+# 3. Plot monthly distribution comparisons
 # =========================================
+# (1) Plot distributions
 save_dir = os.path.join(workspace, "map")
 os.makedirs(save_dir, exist_ok=True)
 
@@ -175,9 +189,7 @@ plt.close()
 print(f"✅ Figure 2 saved → {save_path2}")
 
 
-# =========================================
-# 6. Reshape results into wide format
-# =========================================
+# (2) Reshape results into wide format
 # Extract month (MM) from YYYY-MM
 df_results["month_str"] = df_results["month"].str[-2:]
 
@@ -198,9 +210,7 @@ df_wide = df_wide.reset_index()
 print(df_wide.head())
 
 
-# =========================================
-# 7. Calculate global min/max and Jenks natural breaks
-# =========================================
+# (3) Jenks natural breaks calculation
 deg_all = df_wide[[c for c in df_wide.columns if "deg_cent" in c]].values.flatten()
 ent_all = df_wide[[c for c in df_wide.columns if "entropy_norm" in c]].values.flatten()
 
@@ -223,14 +233,7 @@ print("Jenks breaks — Degree Centrality:", jenks_deg)
 print("Jenks breaks — Entropy:", jenks_ent)
 
 
-# =========================================
-# 8. Merge with shapefile and export
-# =========================================
-cbg = gpd.read_file(workspace + "0-raw/tl_2018_04_bg/tl_2018_04_bg_Maricopa_Pinal.shp")  # 2,704 rows
-cbg = cbg.drop(columns=["GEOID_int", "GEOID_in_1"], errors="ignore")
-cbg = cbg[["GEOID", "geometry"]]
-cbg["GEOID"] = cbg["GEOID"].str[1:]  # Remove potential prefix
-
+# (4) Merge with shapefile and export
 # Merge spatial geometry with centrality results
 cbg_with_centrality = cbg.merge(df_wide, on="GEOID", how="left")
 
