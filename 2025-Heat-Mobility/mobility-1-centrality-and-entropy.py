@@ -1,20 +1,8 @@
-# =========================================
-# 0. Import libraries
-# =========================================
+import os
+
 import pandas as pd
 import geopandas as gpd
-import glob
-import os
 import networkx as nx
-from scipy.stats import linregress
-from tqdm import tqdm
-import matplotlib.pyplot as plt
-import matplotlib
-matplotlib.use('Agg')
-import numpy as np
-from scipy.stats import gaussian_kde
-from mapclassify import JenksCaspall
-
 
 # =========================================
 # 1. Load mobility data
@@ -47,29 +35,27 @@ df_raw = df_raw[
     (df_raw["date_range_start"] <= "2023-08-28")
 ] # 3,351,816 rows
 
-# Aggregate visitors by month
-df_raw.loc[:, "month"] = df_raw["date_range_start"].dt.to_period("M").astype(str)
+# Aggregate visitors
 df = (
-    df_raw.groupby(["month", "visitor_home_cbgs", "poi_cbg"], as_index=False)
+    df_raw.groupby(["visitor_home_cbgs", "poi_cbg"], as_index=False)
     .agg({"visitor": "sum"})
 )
-df["visitor_home_cbgs"] = df["visitor_home_cbgs"].astype(str) # 1,993,151 rows
-df.to_csv(workspace + "1-processed/centrality/df.csv", index=False, encoding="utf-8-sig")
+df["visitor_home_cbgs"] = df["visitor_home_cbgs"].astype(str)
+df["poi_cbg"] = df["poi_cbg"].astype(str)
+df.to_csv(workspace + "1-processed/centrality/df.csv", index=False, encoding="utf-8-sig") # 1,287,615 rows
 
 del df_raw
 
 
 # =========================================
-# 2. Monthly Network Analysis – Temporal
+# 2. Network Analysis – Summer Combined
 # =========================================
-# Calculate centrality and flow diversity for each month
-def calculate_monthly_centrality(df, month):
-    # Filter data by month
-    df_month = df[df["month"] == month].copy()
+# Calculate degree centrality and flow entropy for the entire summer (June–August)
 
+def calculate_summer_centrality(df):
     # Create directed graph using visitors as edge weights
     G = nx.from_pandas_edgelist(
-        df_month,
+        df,
         source="visitor_home_cbgs",
         target="poi_cbg",
         edge_attr="visitor",
@@ -79,25 +65,26 @@ def calculate_monthly_centrality(df, month):
     # Compute degree centrality
     degree_centrality = nx.degree_centrality(G)
 
-    # Use only origin nodes
-    origin_nodes = df_month["visitor_home_cbgs"].unique()
+    # List of origin nodes
+    origin_nodes = df["visitor_home_cbgs"].unique()
 
     # Compute flow entropy (mobility diversity)
-    flow = df_month.groupby(["visitor_home_cbgs", "poi_cbg"])["visitor"].sum().reset_index()
+    flow = df.groupby(["visitor_home_cbgs", "poi_cbg"])["visitor"].sum().reset_index()
     flow["total"] = flow.groupby("visitor_home_cbgs")["visitor"].transform("sum")
     flow["p_ij"] = flow["visitor"] / flow["total"]
 
-    # Avoid log(0)
+    # Calculate entropy component: -p * log(p)
     flow["entropy_component"] = -flow["p_ij"] * np.where(flow["p_ij"] > 0, np.log(flow["p_ij"]), 0)
 
-    # Aggregate entropy by origin
+    # Aggregate entropy by origin CBG
     entropy_home = flow.groupby("visitor_home_cbgs")["entropy_component"].sum().reset_index()
     entropy_home.columns = ["GEOID", "entropy"]
 
-    # Count number of destinations
+    # Count number of unique destinations for each origin
     dest_count = flow.groupby("visitor_home_cbgs")["poi_cbg"].nunique().reset_index()
     dest_count.columns = ["GEOID", "num_dests"]
 
+    # Merge destination counts
     entropy_home = entropy_home.merge(dest_count, on="GEOID", how="left")
 
     # Normalize entropy by log(number of destinations)
@@ -107,138 +94,87 @@ def calculate_monthly_centrality(df, month):
         np.nan
     )
 
-    # Combine centrality data by origin
+    # Combine degree centrality and entropy results
     df_cent = pd.DataFrame({
         "GEOID": origin_nodes,
-        "month": month,
         "deg_cent": [degree_centrality.get(node, np.nan) for node in origin_nodes]
     })
 
-    # Merge entropy results (keeping NaNs)
     df_cent = df_cent.merge(entropy_home[["GEOID", "entropy", "entropy_norm"]],
                             on="GEOID", how="left")
 
     return df_cent
 
 
-# Compute monthly centralities
-df_cent_june = calculate_monthly_centrality(df, "2023-06")
-df_cent_july = calculate_monthly_centrality(df, "2023-07")
-df_cent_aug = calculate_monthly_centrality(df, "2023-08")
+# Run the analysis for the summer-combined dataset
+df_results = calculate_summer_centrality(df)
 
-# Combine results
-df_results = pd.concat([df_cent_june, df_cent_july, df_cent_aug], ignore_index=True)
+# Save output
+output_path_centrality = os.path.join(workspace, "1-processed", "centrality", "cbg_centrality_summer.csv")
+df_results.to_csv(output_path_centrality, index=False, encoding="utf-8-sig")
+print(f"Centrality and entropy metrics saved to: {output_path_centrality}")
 
 
 # =========================================
-# 3. Plot monthly distribution comparisons
+# 3. Distribution Analysis – Summer Combined
 # =========================================
-# (1) Plot distributions
+import os
+import matplotlib.pyplot as plt
+from scipy.stats import gaussian_kde
+import numpy as np
+from mapclassify import JenksCaspall
+
+# Create directory for figures
 save_dir = os.path.join(workspace, "map")
 os.makedirs(save_dir, exist_ok=True)
 
-# Figure 1: Degree Centrality distribution comparison (June–August)
+# (1) Plot distribution of degree centrality and normalized entropy
 plt.figure(figsize=(8, 6))
-months = sorted(df_results["month"].unique())
+subset = df_results["deg_cent"].dropna()
 
-for month in months:
-    subset = df_results[df_results["month"] == month]["deg_cent"].dropna()
-    if subset.empty:
-        print(f"⚠️ {month}: no degree centrality data — skipped")
-        continue
-
-    kde = gaussian_kde(subset)
-    x_vals = np.linspace(subset.min(), subset.max(), 500)
-    y_vals = kde(x_vals)
-    plt.plot(x_vals, y_vals, linewidth=2, label=f"{month}")
+kde = gaussian_kde(subset)
+x_vals = np.linspace(subset.min(), subset.max(), 500)
+y_vals = kde(x_vals)
+plt.plot(x_vals, y_vals, linewidth=2, color="steelblue")
 
 plt.xlabel("Degree Centrality")
 plt.ylabel("Density")
 plt.title("Degree Centrality Distribution (June–August 2023)")
-plt.legend(title="Month")
 plt.grid(True)
 
-save_path1 = os.path.join(save_dir, "Figure1_degree_centrality_comparison.png")
+save_path1 = os.path.join(save_dir, "Figure1_degree_centrality_summer.png")
 plt.savefig(save_path1, dpi=300, bbox_inches="tight")
 plt.close()
-print(f"✅ Figure 1 saved → {save_path1}")
+print(f"Figure 1 saved to: {save_path1}")
 
-# Figure 2: Normalized Entropy distribution comparison (June–August)
+# Plot normalized entropy distribution
 plt.figure(figsize=(8, 6))
+subset = df_results["entropy_norm"].dropna()
 
-for month in months:
-    subset = df_results[df_results["month"] == month]["entropy_norm"].dropna()
-    if subset.empty:
-        print(f"⚠️ {month}: no entropy data — skipped")
-        continue
-
-    kde = gaussian_kde(subset)
-    x_vals = np.linspace(subset.min(), subset.max(), 500)
-    y_vals = kde(x_vals)
-    plt.plot(x_vals, y_vals, linewidth=2, label=f"{month}")
+kde = gaussian_kde(subset)
+x_vals = np.linspace(subset.min(), subset.max(), 500)
+y_vals = kde(x_vals)
+plt.plot(x_vals, y_vals, linewidth=2, color="darkorange")
 
 plt.xlabel("Normalized Entropy (Flow Diversity)")
 plt.ylabel("Density")
 plt.title("Flow Diversity (Entropy) Distribution (June–August 2023)")
-plt.legend(title="Month")
 plt.grid(True)
 
-save_path2 = os.path.join(save_dir, "Figure2_entropy_comparison.png")
+save_path2 = os.path.join(save_dir, "Figure2_entropy_summer.png")
 plt.savefig(save_path2, dpi=300, bbox_inches="tight")
 plt.close()
-print(f"✅ Figure 2 saved → {save_path2}")
+print(f"Figure 2 saved to: {save_path2}")
 
+# (2) Merge with shapefile and export
+cbg_with_centrality = cbg.merge(df_results, on="GEOID", how="left")
 
-# (2) Reshape results into wide format
-# Extract month (MM) from YYYY-MM
-df_results["month_str"] = df_results["month"].str[-2:]
-
-# Pivot to wide format
-df_wide = df_results.pivot_table(
-    index="GEOID",
-    columns="month_str",
-    values=["deg_cent", "entropy", "entropy_norm"]
+output_path_centrality = os.path.join(
+    workspace, "1-processed", "centrality", "cbg_with_centrality_summer.gpkg"
 )
 
-# Flatten multi-level column names
-df_wide.columns = [f"{var}_{month}" for var, month in df_wide.columns]
+cbg_with_centrality.to_file(
+    output_path_centrality, layer="centrality", driver="GPKG", encoding="utf-8"
+)
 
-# Restore index as column
-df_wide = df_wide.reset_index()
-
-# Preview
-print(df_wide.head())
-
-
-# (3) Jenks natural breaks calculation
-deg_all = df_wide[[c for c in df_wide.columns if "deg_cent" in c]].values.flatten()
-ent_all = df_wide[[c for c in df_wide.columns if "entropy_norm" in c]].values.flatten()
-
-# Remove NaNs
-deg_all = deg_all[~np.isnan(deg_all)]
-ent_all = ent_all[~np.isnan(ent_all)]
-
-# Compute min/max
-deg_min, deg_max = deg_all.min(), deg_all.max()
-ent_min, ent_max = ent_all.min(), ent_all.max()
-
-print("Degree Centrality:", deg_min, deg_max)
-print("Entropy:", ent_min, ent_max)
-
-# Jenks natural breaks (5 classes)
-jenks_deg = JenksCaspall(deg_all, k=5).bins
-jenks_ent = JenksCaspall(ent_all, k=5).bins
-
-print("Jenks breaks — Degree Centrality:", jenks_deg)
-print("Jenks breaks — Entropy:", jenks_ent)
-
-
-# (4) Merge with shapefile and export
-# Merge spatial geometry with centrality results
-cbg_with_centrality = cbg.merge(df_wide, on="GEOID", how="left")
-
-# Export as GeoPackage
-output_path_centrality = os.path.join(workspace, "1-processed", "centrality", "cbg_with_centrality.gpkg")
-cbg_with_centrality.to_file(output_path_centrality, layer="centrality", driver="GPKG", encoding="utf-8")
-
-print(f"✅ GeoPackage saved → {output_path_centrality}")
+print(f"GeoPackage saved to: {output_path_centrality}")
