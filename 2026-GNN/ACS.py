@@ -1,3 +1,14 @@
+"""
+============================================================
+ACS Socioeconomic Variable Download & Construction
+============================================================
+Downloads 2023 ACS 5-year estimates for LA, SD, SF census tracts.
+Constructs 27 SES variables from detailed and subject tables.
+
+Output: ACS_SES_tract.csv (GEOID + 27 variables)
+============================================================
+"""
+
 import os
 import requests
 import pandas as pd
@@ -7,15 +18,15 @@ from functools import reduce
 # ============================================================
 # 1. User settings
 # ============================================================
-WORKSPACE = "*"
+WORKSPACE = r"*\data"
 API_KEY = "*"
 YEAR = 2023
 
 STATE_FIPS = "06"
 COUNTIES = ["037", "073", "075"]  # Los Angeles, San Diego, San Francisco
 
-TRACT_SHP = WORKSPACE + "data/tl_2023_06_tract/tl_2023_06_tract.shp"
-OUTPUT_CSV = WORKSPACE + "data/ACS_tract_CA_selected.csv"
+TRACT_SHP = os.path.join(WORKSPACE, "tracts.shp")
+OUTPUT_CSV = os.path.join(WORKSPACE, "ACS_SES_tract.csv")
 
 # ============================================================
 # 2. Census API endpoints
@@ -30,45 +41,93 @@ BASE_SUBJECT = f"https://api.census.gov/data/{YEAR}/acs/acs5/subject"
 # ---------- Detailed tables ----------
 DETAILED_VARS = {
     "income": [
-        "B19013_001E"  # Median household income (USD)
+        "B19013_001E"           # Median household income (USD)
     ],
     "race": [
-        "B03002_001E",  # Total population
-        "B03002_003E",  # Non-Hispanic White population
-        "B03002_004E",  # Non-Hispanic Black population
-        "B03002_005E",  # American Indian and Alaska Native population (non-Hispanic)
-        "B03002_006E",  # Asian population (non-Hispanic)
-        "B03002_007E",  # Native Hawaiian and Other Pacific Islander population (non-Hispanic)
-        "B03002_012E"   # Hispanic or Latino population
+        "B03002_001E",          # Total population
+        "B03002_003E",          # Non-Hispanic White
+        "B03002_004E",          # Non-Hispanic Black
+        #"B03002_005E",          # American Indian / Alaska Native
+        "B03002_006E",          # Asian
+        #"B03002_007E",          # Native Hawaiian / Pacific Islander
+        "B03002_012E"           # Hispanic or Latino
     ],
     "rent": [
-        "B25003_001E",  # Total occupied housing units
-        "B25003_003E"   # Renter-occupied housing units
+        "B25003_001E",          # Total occupied housing units
+        "B25003_003E"           # Renter-occupied housing units
+    ],
+    "gini": [
+        "B19083_001E"           # Gini Index of Income Inequality (0~1)
+    ],
+    "living_alone": [
+        "B11001_001E",          # Total households
+        "B11001_008E"           # Householder living alone
+    ],
+    "single_parent": [
+        "B11003_001E",          # Total families
+        "B11003_010E",          # Male householder, no spouse, with children
+        "B11003_016E"           # Female householder, no spouse, with children
+    ],
+    "foreign_born": [
+        "B05002_001E",          # Total population
+        "B05002_013E"           # Foreign born
+    ],
+    "vacancy": [
+        "B25002_001E",          # Total housing units
+        "B25002_003E"           # Vacant housing units
+    ],
+    "overcrowding": [
+        "B25014_001E",          # Total occupied housing units
+        "B25014_005E",          # Owner: 1.01 to 1.50 occupants per room
+        "B25014_006E",          # Owner: 1.51 to 2.00 occupants per room
+        "B25014_007E",          # Owner: 2.01 or more occupants per room
+        "B25014_011E",          # Renter: 1.01 to 1.50 occupants per room
+        "B25014_012E",          # Renter: 1.51 to 2.00 occupants per room
+        "B25014_013E"           # Renter: 2.01 or more occupants per room
+    ],
+    "median_rent": [
+        "B25064_001E"           # Median gross rent ($)
+    ],
+    "rent_burden": [
+        "B25070_001E",          # Total renter households
+        "B25070_007E",          # 30.0 ~ 34.9%
+        "B25070_008E",          # 35.0 ~ 39.9%
+        "B25070_009E",          # 40.0 ~ 49.9%
+        "B25070_010E"           # 50.0% or more
     ]
 }
 
 # ---------- Subject tables ----------
 SUBJECT_VARS = {
     "poverty": [
-        "S1701_C03_001E"  # Poverty rate (% below poverty line)
+        "S1701_C03_001E"        # Poverty rate (% below poverty line)
     ],
     "education": [
-        "S1501_C02_015E"  # % population age 25+ with a college degree
+        "S1501_C02_015E"        # % population age 25+ with college degree
     ],
     "age": [
-        "S0101_C01_001E",  # Total population (count)
-        "S0101_C01_022E",  # Population under 18 years (count)
-        "S0101_C02_030E"   # % population age 65+ (elderly)
+        "S0101_C01_001E",       # Total population (count)
+        "S0101_C01_022E",       # Population under 18 years (count)
+        "S0101_C02_030E"        # % population age 65+ (elderly)
     ],
     "employment": [
-        "S2301_C04_001E"  # Unemployment rate (%)
+        "S2301_C04_001E"        # Unemployment rate (%)
     ],
     "insurance": [
-        "S2701_C05_001E"  # % population without health insurance
+        "S2701_C05_001E"        # % population without health insurance
     ],
     "language": [
-        "S1601_C01_001E", # population age 5+
-        "S1601_C05_001E"  # population age 5+ with limited English proficiency
+        "S1601_C01_001E",       # Population age 5+
+        "S1601_C05_001E"        # Population age 5+ with limited English
+    ],
+    "disability": [
+        "S1810_C03_001E"        # Percent with a disability
+    ],
+    "commute": [
+        "S0801_C01_046E"        # Mean travel time to work (minutes)
+    ],
+    "internet": [
+        "S2801_C02_019E"        # Percent without internet subscription
     ]
 }
 
@@ -76,6 +135,7 @@ SUBJECT_VARS = {
 # 4. Helper functions
 # ============================================================
 def fetch_acs(endpoint, variables):
+    """Download ACS data for all counties from Census API."""
     frames = []
 
     for county in COUNTIES:
@@ -97,6 +157,7 @@ def fetch_acs(endpoint, variables):
 
 
 def clean_numeric(df):
+    """Convert all non-ID columns to numeric."""
     for col in df.columns:
         if col not in ["NAME", "state", "county", "tract", "GEOID"]:
             df[col] = pd.to_numeric(df[col], errors="coerce")
@@ -104,12 +165,15 @@ def clean_numeric(df):
 
 
 def safe_pct(num, denom):
+    """Calculate percentage safely, avoiding division by zero."""
     return (num / denom.replace({0: pd.NA})) * 100
 
 
 def load_area(shp_path):
+    """Calculate tract area in km² from shapefile."""
     gdf = gpd.read_file(shp_path)
-    gdf = gdf[gdf["COUNTYFP"].isin(COUNTIES)].copy()
+    gdf["GEOID"] = gdf["GEOID"].astype(str).str.zfill(11)
+    gdf = gdf[gdf["GEOID"].str[2:5].isin(COUNTIES)].copy()
 
     # Reproject to California Albers for area calculation
     gdf_proj = gdf.to_crs(epsg=3310)
@@ -121,17 +185,29 @@ def load_area(shp_path):
 # ============================================================
 # 5. Download data
 # ============================================================
+print("=" * 60)
+print("Downloading ACS data...")
+print("=" * 60)
+
 frames = []
 
-for vars_list in DETAILED_VARS.values():
+# Detailed tables
+for group_name, vars_list in DETAILED_VARS.items():
+    print(f"  Downloading detailed table: {group_name} ({len(vars_list)} vars)")
     frames.append(fetch_acs(BASE_DETAILED, vars_list))
 
-for vars_list in SUBJECT_VARS.values():
+# Subject tables
+for group_name, vars_list in SUBJECT_VARS.items():
+    print(f"  Downloading subject table: {group_name} ({len(vars_list)} vars)")
     frames.append(fetch_acs(BASE_SUBJECT, vars_list))
+
+print(f"  Downloaded {len(frames)} table groups")
 
 # ============================================================
 # 6. Merge all tables
 # ============================================================
+print("\nMerging tables...")
+
 acs = reduce(
     lambda left, right: pd.merge(
         left,
@@ -152,7 +228,7 @@ acs["GEOID"] = acs["state"] + acs["county"] + acs["tract"]
 
 acs = clean_numeric(acs)
 
-# Optional: replace common Census missing-value sentinels
+# Replace Census missing-value sentinels
 acs = acs.replace({
     -666666666: pd.NA,
     -555555555: pd.NA,
@@ -161,91 +237,170 @@ acs = acs.replace({
     -888888888: pd.NA
 })
 
+print(f"Total tracts downloaded: {len(acs)}")
+
 # ============================================================
 # 8. Variable construction
 # ============================================================
+print("\nConstructing variables...")
 
-# Income
+# --- Income & Inequality ---
 acs["Median_income"] = acs["B19013_001E"]
+acs["Gini_index"] = acs["B19083_001E"]
 
-# Poverty
+# --- Poverty ---
 acs["Poverty_rate"] = acs["S1701_C03_001E"]
 
-# Race / ethnicity
-acs["Pct_white"] = safe_pct(acs["B03002_003E"], acs["B03002_001E"])     # Non-Hispanic White
-acs["Pct_black"] = safe_pct(acs["B03002_004E"], acs["B03002_001E"])     # Non-Hispanic Black
-acs["Pct_native"] = safe_pct(acs["B03002_005E"], acs["B03002_001E"])    # American Indian / Alaska Native
-acs["Pct_asian"] = safe_pct(acs["B03002_006E"], acs["B03002_001E"])     # Asian
-acs["Pct_pacific"] = safe_pct(acs["B03002_007E"], acs["B03002_001E"])   # Pacific Islander
-acs["Pct_hispanic"] = safe_pct(acs["B03002_012E"], acs["B03002_001E"])  # Hispanic
-acs["Pct_minority"] = safe_pct(
-    acs["B03002_001E"] - acs["B03002_003E"],
-    acs["B03002_001E"]
-)
+# --- Race / Ethnicity ---
+acs["Pct_white"] = safe_pct(acs["B03002_003E"], acs["B03002_001E"])
+acs["Pct_black"] = safe_pct(acs["B03002_004E"], acs["B03002_001E"])
+#acs["Pct_native"] = safe_pct(acs["B03002_005E"], acs["B03002_001E"])
+acs["Pct_asian"] = safe_pct(acs["B03002_006E"], acs["B03002_001E"])
+#acs["Pct_pacific"] = safe_pct(acs["B03002_007E"], acs["B03002_001E"])
+acs["Pct_hispanic"] = safe_pct(acs["B03002_012E"], acs["B03002_001E"])
 
-# Education
+# --- Education ---
 acs["Pct_college"] = acs["S1501_C02_015E"]
 
-# Age
+# --- Age ---
 acs["Pct_elderly"] = acs["S0101_C02_030E"]
+acs["Pct_under18"] = safe_pct(acs["S0101_C01_022E"], acs["S0101_C01_001E"])
 
-acs["Pct_under18"] = safe_pct(
-    acs["S0101_C01_022E"],  # Population under 18 years (count)
-    acs["S0101_C01_001E"]   # Total population (count)
+# --- Employment ---
+acs["Unemployment_rate"] = acs["S2301_C04_001E"]
+
+# --- Insurance ---
+acs["Pct_uninsured"] = acs["S2701_C05_001E"]
+
+# --- Housing ---
+acs["Pct_renter"] = safe_pct(acs["B25003_003E"], acs["B25003_001E"])
+acs["Median_rent"] = acs["B25064_001E"]
+acs["Vacancy_rate"] = safe_pct(acs["B25002_003E"], acs["B25002_001E"])
+acs["Rent_burden"] = safe_pct(
+    acs["B25070_007E"] + acs["B25070_008E"] + acs["B25070_009E"] + acs["B25070_010E"],
+    acs["B25070_001E"]
 )
 
-# Employment
-acs["Unemployment"] = acs["S2301_C04_001E"]
+# --- Overcrowding (1.01+ occupants per room, owner + renter) ---
+acs["Overcrowding"] = safe_pct(
+    acs["B25014_005E"] + acs["B25014_006E"] + acs["B25014_007E"] +
+    acs["B25014_011E"] + acs["B25014_012E"] + acs["B25014_013E"],
+    acs["B25014_001E"]
+)
 
-# Insurance
-acs["Pct_no_insurance"] = acs["S2701_C05_001E"]
+# --- Language ---
+acs["Pct_LEP"] = safe_pct(acs["S1601_C05_001E"], acs["S1601_C01_001E"])
 
-# Housing
-acs["Pct_renter"] = safe_pct(acs["B25003_003E"], acs["B25003_001E"])
+# --- Social Isolation ---
+acs["Pct_living_alone"] = safe_pct(acs["B11001_008E"], acs["B11001_001E"])
 
-# Language
-acs["Pct_limited_eng"] = safe_pct(acs["S1601_C05_001E"], acs["S1601_C01_001E"])
+# --- Family Structure ---
+acs["Pct_single_parent"] = safe_pct(
+    acs["B11003_010E"] + acs["B11003_016E"],
+    acs["B11003_001E"]
+)
+
+# --- Immigration ---
+acs["Pct_foreign_born"] = safe_pct(acs["B05002_013E"], acs["B05002_001E"])
+
+# --- Disability ---
+acs["Pct_disability"] = acs["S1810_C03_001E"]
+
+# --- Commute ---
+acs["Commute_time"] = acs["S0801_C01_046E"]
+
+# --- Digital Access ---
+acs["Pct_no_internet"] = acs["S2801_C02_019E"]
 
 # ============================================================
 # 9. Population density
 # ============================================================
+print("Calculating population density...")
+
 area_df = load_area(TRACT_SHP)
 acs = acs.merge(area_df, on="GEOID", how="left")
-
 acs["Pop_density"] = acs["B03002_001E"] / acs["area_km2"].replace({0: pd.NA})
 
 # ============================================================
 # 10. Final dataset
 # ============================================================
-final = acs[
-    [
-        "GEOID",
-        "NAME",
-        "Median_income",
-        "Poverty_rate",
-        "Pct_white",
-        "Pct_black",
-        "Pct_native",
-        "Pct_asian",
-        "Pct_pacific",
-        "Pct_hispanic",
-        "Pct_minority",
-        "Pct_college",
-        "Pct_elderly",
-        "Pct_under18",
-        "Unemployment",
-        "Pct_no_insurance",
-        "Pct_renter",
-        "Pop_density",
-        "Pct_limited_eng"
-    ]
-].copy()
+final_columns = [
+    "GEOID",
+    "NAME",
+    # Income & Inequality
+    "Median_income",
+    "Poverty_rate",
+    "Gini_index",
+    # Race / Ethnicity
+    "Pct_white",
+    "Pct_black",
+    "Pct_native",
+    "Pct_asian",
+    "Pct_pacific",
+    "Pct_hispanic",
+    # Education
+    "Pct_college",
+    # Age
+    "Pct_elderly",
+    "Pct_under18",
+    # Employment
+    "Unemployment_rate",
+    # Insurance
+    "Pct_uninsured",
+    # Housing
+    "Pct_renter",
+    "Median_rent",
+    "Rent_burden",
+    "Vacancy_rate",
+    "Overcrowding",
+    # Population
+    "Pop_density",
+    # Language
+    "Pct_LEP",
+    # Social Isolation
+    "Pct_living_alone",
+    # Family
+    "Pct_single_parent",
+    # Immigration
+    "Pct_foreign_born",
+    # Disability
+    "Pct_disability",
+    # Commute
+    "Commute_time",
+    # Digital Access
+    "Pct_no_internet",
+]
+
+final = acs[final_columns].copy()
 
 # ============================================================
-# 11. Export
+# 11. Summary & Export
 # ============================================================
+print("\n" + "=" * 60)
+print("SUMMARY")
+print("=" * 60)
+
+print(f"Total tracts: {len(final)}")
+print(f"Variables: {len(final_columns) - 2} (excluding GEOID, NAME)")
+
+# Count per county
+for county, name in [("037", "Los Angeles"), ("073", "San Diego"), ("075", "San Francisco")]:
+    n = final["GEOID"].str[2:5].eq(county).sum()
+    print(f"  {name}: {n} tracts")
+
+# Missing value check
+print("\nMissing values per variable:")
+num_cols = [c for c in final_columns if c not in ["GEOID", "NAME"]]
+for col in num_cols:
+    n_miss = final[col].isna().sum()
+    if n_miss > 0:
+        print(f"  {col:25s}: {n_miss} missing ({n_miss/len(final)*100:.1f}%)")
+
+# Quick stats
+print("\nVariable ranges:")
+print(final[num_cols].describe().loc[["min", "max", "mean"]].round(2).to_string())
+
+# Save
 final.to_csv(OUTPUT_CSV, index=False)
-
-print(final.head())
-print("Saved:", OUTPUT_CSV)
-print("Number of tracts:", len(final))
+print(f"\nSaved: {OUTPUT_CSV}")
+print("Done!")
