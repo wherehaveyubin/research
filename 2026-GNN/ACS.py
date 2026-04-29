@@ -3,16 +3,15 @@
 ACS Socioeconomic Variable Download & Construction
 ============================================================
 Downloads 2023 ACS 5-year estimates for LA, SD, SF census tracts.
-Constructs 27 SES variables from detailed and subject tables.
+Constructs 26 SES variables from detailed and subject tables.
 
-Output: ACS_SES_tract.csv (GEOID + 27 variables)
+Output: ACS_SES_tract.csv (GEOID + 26 variables)
 ============================================================
 """
 
 import os
 import requests
 import pandas as pd
-import geopandas as gpd
 from functools import reduce
 
 # ============================================================
@@ -47,9 +46,9 @@ DETAILED_VARS = {
         "B03002_001E",          # Total population
         "B03002_003E",          # Non-Hispanic White
         "B03002_004E",          # Non-Hispanic Black
-        #"B03002_005E",          # American Indian / Alaska Native
+        "B03002_005E",          # American Indian / Alaska Native
         "B03002_006E",          # Asian
-        #"B03002_007E",          # Native Hawaiian / Pacific Islander
+        "B03002_007E",          # Native Hawaiian / Pacific Islander
         "B03002_012E"           # Hispanic or Latino
     ],
     "rent": [
@@ -106,8 +105,7 @@ SUBJECT_VARS = {
         "S1501_C02_015E"        # % population age 25+ with college degree
     ],
     "age": [
-        "S0101_C01_001E",       # Total population (count)
-        "S0101_C01_022E",       # Population under 18 years (count)
+        "S0101_C02_022E",       # % Population under 18 years
         "S0101_C02_030E"        # % population age 65+ (elderly)
     ],
     "employment": [
@@ -117,8 +115,7 @@ SUBJECT_VARS = {
         "S2701_C05_001E"        # % population without health insurance
     ],
     "language": [
-        "S1601_C01_001E",       # Population age 5+
-        "S1601_C05_001E"        # Population age 5+ with limited English
+        "S1601_C05_001E"        # % LEP among specified language speakers (5+)
     ],
     "disability": [
         "S1810_C03_001E"        # Percent with a disability
@@ -167,20 +164,6 @@ def clean_numeric(df):
 def safe_pct(num, denom):
     """Calculate percentage safely, avoiding division by zero."""
     return (num / denom.replace({0: pd.NA})) * 100
-
-
-def load_area(shp_path):
-    """Calculate tract area in km² from shapefile."""
-    gdf = gpd.read_file(shp_path)
-    gdf["GEOID"] = gdf["GEOID"].astype(str).str.zfill(11)
-    gdf = gdf[gdf["GEOID"].str[2:5].isin(COUNTIES)].copy()
-
-    # Reproject to California Albers for area calculation
-    gdf_proj = gdf.to_crs(epsg=3310)
-    gdf["area_km2"] = gdf_proj.geometry.area / 1_000_000
-
-    return gdf[["GEOID", "area_km2"]]
-
 
 # ============================================================
 # 5. Download data
@@ -234,7 +217,8 @@ acs = acs.replace({
     -555555555: pd.NA,
     -333333333: pd.NA,
     -222222222: pd.NA,
-    -888888888: pd.NA
+    -888888888: pd.NA,
+    -999999999: pd.NA
 })
 
 print(f"Total tracts downloaded: {len(acs)}")
@@ -254,9 +238,9 @@ acs["Poverty_rate"] = acs["S1701_C03_001E"]
 # --- Race / Ethnicity ---
 acs["Pct_white"] = safe_pct(acs["B03002_003E"], acs["B03002_001E"])
 acs["Pct_black"] = safe_pct(acs["B03002_004E"], acs["B03002_001E"])
-#acs["Pct_native"] = safe_pct(acs["B03002_005E"], acs["B03002_001E"])
+acs["Pct_native"] = safe_pct(acs["B03002_005E"], acs["B03002_001E"])
 acs["Pct_asian"] = safe_pct(acs["B03002_006E"], acs["B03002_001E"])
-#acs["Pct_pacific"] = safe_pct(acs["B03002_007E"], acs["B03002_001E"])
+acs["Pct_pacific"] = safe_pct(acs["B03002_007E"], acs["B03002_001E"])
 acs["Pct_hispanic"] = safe_pct(acs["B03002_012E"], acs["B03002_001E"])
 
 # --- Education ---
@@ -264,7 +248,7 @@ acs["Pct_college"] = acs["S1501_C02_015E"]
 
 # --- Age ---
 acs["Pct_elderly"] = acs["S0101_C02_030E"]
-acs["Pct_under18"] = safe_pct(acs["S0101_C01_022E"], acs["S0101_C01_001E"])
+acs["Pct_under18"] = acs["S0101_C02_022E"]
 
 # --- Employment ---
 acs["Unemployment_rate"] = acs["S2301_C04_001E"]
@@ -289,7 +273,7 @@ acs["Overcrowding"] = safe_pct(
 )
 
 # --- Language ---
-acs["Pct_LEP"] = safe_pct(acs["S1601_C05_001E"], acs["S1601_C01_001E"])
+acs["Pct_LEP"] = acs["S1601_C05_001E"]
 
 # --- Social Isolation ---
 acs["Pct_living_alone"] = safe_pct(acs["B11001_008E"], acs["B11001_001E"])
@@ -313,16 +297,7 @@ acs["Commute_time"] = acs["S0801_C01_046E"]
 acs["Pct_no_internet"] = acs["S2801_C02_019E"]
 
 # ============================================================
-# 9. Population density
-# ============================================================
-print("Calculating population density...")
-
-area_df = load_area(TRACT_SHP)
-acs = acs.merge(area_df, on="GEOID", how="left")
-acs["Pop_density"] = acs["B03002_001E"] / acs["area_km2"].replace({0: pd.NA})
-
-# ============================================================
-# 10. Final dataset
+# 9. Final dataset
 # ============================================================
 final_columns = [
     "GEOID",
@@ -353,8 +328,6 @@ final_columns = [
     "Rent_burden",
     "Vacancy_rate",
     "Overcrowding",
-    # Population
-    "Pop_density",
     # Language
     "Pct_LEP",
     # Social Isolation
@@ -372,6 +345,29 @@ final_columns = [
 ]
 
 final = acs[final_columns].copy()
+
+# ============================================================
+# 10. Remove unreliable tracts
+# ============================================================
+
+# Total population is B03002_001E (already in acs)
+final["total_pop"] = acs["B03002_001E"]
+final["total_households"] = acs["B11001_001E"]
+
+before = len(final)
+
+# Remove tracts with population < 100 or households < 30
+final = final[
+    (final["total_pop"] >= 100) &
+    (final["total_households"] >= 30)
+].copy()
+
+# Drop helper columns
+final = final.drop(columns=["total_pop", "total_households"])
+
+print(f"Removed {before - len(final)} unreliable tracts "
+      f"(pop < 100 or households < 30)")
+print(f"Remaining: {len(final)} tracts")
 
 # ============================================================
 # 11. Summary & Export
@@ -392,13 +388,15 @@ for county, name in [("037", "Los Angeles"), ("073", "San Diego"), ("075", "San 
 print("\nMissing values per variable:")
 num_cols = [c for c in final_columns if c not in ["GEOID", "NAME"]]
 for col in num_cols:
+    final[col] = pd.to_numeric(final[col], errors="coerce")
     n_miss = final[col].isna().sum()
     if n_miss > 0:
         print(f"  {col:25s}: {n_miss} missing ({n_miss/len(final)*100:.1f}%)")
 
 # Quick stats
 print("\nVariable ranges:")
-print(final[num_cols].describe().loc[["min", "max", "mean"]].round(2).to_string())
+stats = final[num_cols].agg(["min", "max", "mean"]).round(2)
+print(stats.to_string())
 
 # Save
 final.to_csv(OUTPUT_CSV, index=False)
