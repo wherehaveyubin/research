@@ -18,7 +18,7 @@ from functools import reduce
 # 1. User settings
 # ============================================================
 WORKSPACE = r"*\data"
-API_KEY = "*"
+API_KEY = "*"  # Replace with your Census API key
 YEAR = 2023
 
 STATE_FIPS = "06"
@@ -115,6 +115,7 @@ SUBJECT_VARS = {
         "S2701_C05_001E"        # % population without health insurance
     ],
     "language": [
+        "S1601_C01_001E",       # Population age 5+
         "S1601_C05_001E"        # % LEP among specified language speakers (5+)
     ],
     "disability": [
@@ -273,7 +274,7 @@ acs["Overcrowding"] = safe_pct(
 )
 
 # --- Language ---
-acs["Pct_LEP"] = acs["S1601_C05_001E"]
+acs["Pct_LEP"] = safe_pct(acs["S1601_C05_001E"], acs["S1601_C01_001E"])
 
 # --- Social Isolation ---
 acs["Pct_living_alone"] = safe_pct(acs["B11001_008E"], acs["B11001_001E"])
@@ -402,3 +403,7 @@ print(stats.to_string())
 final.to_csv(OUTPUT_CSV, index=False)
 print(f"\nSaved: {OUTPUT_CSV}")
 print("Done!")
+
+
+
+# remove 06075017903
